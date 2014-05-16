@@ -61,32 +61,32 @@ func (l *logger) Clone(prefix string) Logger {
 
 // Writes the log with TRACE level.
 func (l *logger) Trace(format string, args ...interface{}) {
-	l.Output(3, L_TRACE, format, args...)
+	l.Output(1, L_TRACE, format, args...)
 }
 
 // Writes the log with DEBUG level.
 func (l *logger) Debug(format string, args ...interface{}) {
-	l.Output(3, L_DEBUG, format, args...)
+	l.Output(1, L_DEBUG, format, args...)
 }
 
 // Writes the log with INFO level.
 func (l *logger) Info(format string, args ...interface{}) {
-	l.Output(3, L_INFO, format, args...)
+	l.Output(1, L_INFO, format, args...)
 }
 
 // Writes the log with WARN level.
 func (l *logger) Warn(format string, args ...interface{}) {
-	l.Output(3, L_WARN, format, args...)
+	l.Output(1, L_WARN, format, args...)
 }
 
 // Writes the log with ERROR level.
 func (l *logger) Error(format string, args ...interface{}) {
-	l.Output(3, L_ERROR, format, args...)
+	l.Output(1, L_ERROR, format, args...)
 }
 
 // Writes the log with PANIC level.
 func (l *logger) Panic(format string, args ...interface{}) {
-	l.Output(3, L_PANIC, format, args...)
+	l.Output(1, L_PANIC, format, args...)
 }
 
 // Writes the log with custom level and depth.
@@ -94,39 +94,39 @@ func (l *logger) Output(depth, lvl int, format string, args ...interface{}) {
 	if l.level > lvl {
 		return
 	}
-	_, file, line, _ := runtime.Caller(2)
+	_, file, line, _ := runtime.Caller(1 + depth)
 	var fileLine = fmt.Sprintf("%s:%d", filepath.Base(file), line)
-	l.log.Output(depth, fmt.Sprintf("[%5s] %-20s - %s%s", levels[lvl], fileLine, l.prefix, fmt.Sprintf(format, args...)))
+	l.log.Output(0, fmt.Sprintf("[%5s] %-20s - %s%s", levels[lvl], fileLine, l.prefix, fmt.Sprintf(format, args...)))
 }
 
 var defaultLogger = &logger{log.New(os.Stdout, "", log.LstdFlags), 2, ""}
 
 // Writes the default log with TRACE level.
 func Trace(format string, args ...interface{}) {
-	defaultLogger.Output(3, L_TRACE, format, args...)
+	defaultLogger.Output(1, L_TRACE, format, args...)
 }
 
 // Writes the default log with DEBUG level.
 func Debug(format string, args ...interface{}) {
-	defaultLogger.Output(3, L_DEBUG, format, args...)
+	defaultLogger.Output(1, L_DEBUG, format, args...)
 }
 
 // Writes the default log with INFO level.
 func Info(format string, args ...interface{}) {
-	defaultLogger.Output(3, L_INFO, format, args...)
+	defaultLogger.Output(1, L_INFO, format, args...)
 }
 
 // Writes the default log with WARN level.
 func Warn(format string, args ...interface{}) {
-	defaultLogger.Output(3, L_WARN, format, args...)
+	defaultLogger.Output(1, L_WARN, format, args...)
 }
 
 // Writes the default log with ERROR level.
 func Error(format string, args ...interface{}) {
-	defaultLogger.Output(3, L_ERROR, format, args...)
+	defaultLogger.Output(1, L_ERROR, format, args...)
 }
 
 // Writes the default log with PANIC level.
 func Panic(format string, args ...interface{}) {
-	defaultLogger.Output(3, L_PANIC, format, args...)
+	defaultLogger.Output(1, L_PANIC, format, args...)
 }

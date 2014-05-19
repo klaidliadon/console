@@ -2,16 +2,20 @@
 package console
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 )
+
+type LogLevel int
 
 // Logging levels.
 const (
-	L_TRACE = iota
+	L_TRACE = LogLevel(iota)
 	L_DEBUG
 	L_INFO
 	L_WARN
@@ -19,11 +23,38 @@ const (
 	L_PANIC
 )
 
+const _format = "[%5s] %-20s - %s%s"
+
+type Hook interface {
+	// Action performed by the Hook.
+	Action(l LogLevel, fileline, msg string)
+	// Condition that triggers the Hook.
+	Match(l LogLevel, format string, args ...interface{}) bool
+}
+
+// A simple hook that copies messages from a certain level.
+type SimpleHook struct {
+	LogLevel
+	*bytes.Buffer
+}
+
+// Matches only the log level.
+func (s *SimpleHook) Match(l LogLevel, format string, args ...interface{}) bool {
+	return l == s.LogLevel
+}
+
+// Writes log content in a buffer.
+func (s *SimpleHook) Action(l LogLevel, fileline, msg string) {
+	s.WriteString(fmt.Sprintf("%s "+_format, time.Now().Format("2006/01/02 15:04:05"), levels[int(l)], fileline, "", msg))
+}
+
 var levels = []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "PANIC"}
 
 type Logger interface {
 	Clone(string) Logger
-	Output(int, int, string, ...interface{})
+	Add(Hook)
+	Release(Hook)
+	Output(int, LogLevel, string, ...interface{})
 	Trace(string, ...interface{})
 	Debug(string, ...interface{})
 	Info(string, ...interface{})
@@ -33,21 +64,22 @@ type Logger interface {
 }
 
 // Creates a Logger that uses standard output.
-func Std(level int) Logger {
-	l := logger{log.New(os.Stdout, "", log.LstdFlags), level, ""}
+func Std(level LogLevel) Logger {
+	l := logger{log.New(os.Stdout, "", log.LstdFlags), level, "", nil}
 	return &l
 }
 
 // Creates a custom Logger.
-func New(log *log.Logger, level int) Logger {
-	l := logger{log, level, ""}
+func New(log *log.Logger, level LogLevel) Logger {
+	l := logger{log, level, "", nil}
 	return &l
 }
 
 type logger struct {
 	log    *log.Logger
-	level  int
+	level  LogLevel
 	prefix string
+	hooks  []Hook
 }
 
 // Creates a copy of the logger with the given prefix.
@@ -57,6 +89,21 @@ func (l *logger) Clone(prefix string) Logger {
 		newl.prefix = prefix + " "
 	}
 	return &newl
+}
+
+// Adds a Hook to the logger.
+func (l *logger) Add(h Hook) {
+	l.hooks = append(l.hooks, h)
+}
+
+// Release an Hook from the logger.
+func (l *logger) Release(h Hook) {
+	for i := range l.hooks {
+		if l.hooks[i] != h {
+			continue
+		}
+		l.hooks = l.hooks[:i+copy(l.hooks[i:], l.hooks[i+1:])]
+	}
 }
 
 // Writes the log with TRACE level.
@@ -90,16 +137,22 @@ func (l *logger) Panic(format string, args ...interface{}) {
 }
 
 // Writes the log with custom level and depth.
-func (l *logger) Output(depth, lvl int, format string, args ...interface{}) {
+func (l *logger) Output(depth int, lvl LogLevel, format string, args ...interface{}) {
 	if l.level > lvl {
 		return
 	}
 	_, file, line, _ := runtime.Caller(1 + depth)
-	var fileLine = fmt.Sprintf("%s:%d", filepath.Base(file), line)
-	l.log.Output(0, fmt.Sprintf("[%5s] %-20s - %s%s", levels[lvl], fileLine, l.prefix, fmt.Sprintf(format, args...)))
+	fileline := fmt.Sprintf("%s:%d", filepath.Base(file), line)
+	msg := fmt.Sprintf(format, args...)
+	for _, h := range l.hooks {
+		if h.Match(lvl, format, args...) {
+			h.Action(lvl, fileline, msg)
+		}
+	}
+	l.log.Output(0, fmt.Sprintf(_format, levels[int(lvl)], fileline, l.prefix, msg))
 }
 
-var defaultLogger = &logger{log.New(os.Stdout, "", log.LstdFlags), 2, ""}
+var defaultLogger = &logger{log.New(os.Stdout, "", log.LstdFlags), 2, "", nil}
 
 // Writes the default log with TRACE level.
 func Trace(format string, args ...interface{}) {

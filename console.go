@@ -1,121 +1,93 @@
-// Console package implements multi priority logger
 package console
 
 import (
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
 	"runtime"
+	"strings"
+	"sync"
+	"time"
 )
-
-type LogLevel int
-
-// Logging levels.
-const (
-	L_TRACE = LogLevel(iota)
-	L_DEBUG
-	L_INFO
-	L_WARN
-	L_ERROR
-	L_PANIC
-)
-
-const _format = "[%5s] %-20s - %s%s"
 
 // A hook intercepts log message and perform certain tasks, like sending email
 type Hook interface {
+	// Unique Id to identify Hook
+	Id() string
 	// Action performed by the Hook.
-	Action(l LogLevel, fileline, msg string)
+	Action(l LogLvl, msg string)
 	// Condition that triggers the Hook.
-	Match(l LogLevel, format string, args ...interface{}) bool
+	Match(l LogLvl, format string, args ...interface{}) bool
 }
 
-var levels = []string{"TRACE", "DEBUG", "INFO", "WARN", "ERROR", "PANIC"}
-
-// Creates a Logger that uses standard output.
-func Std(level LogLevel) *Logger {
-	l := Logger{log.New(os.Stdout, "", log.LstdFlags), level, "", nil}
-	return &l
+// A Writer implements the WriteString method, as the os.File
+type Writer interface {
+	WriteString(string) (int, error)
 }
 
-// Creates a custom Logger.
-func New(log *log.Logger, level LogLevel) *Logger {
-	l := Logger{log, level, "", nil}
-	return &l
+// Creates a Logger.
+func New(cfg Cfg, w Writer) *Logger {
+	return &Logger{&sync.Mutex{}, cfg, w, make(map[string]Hook)}
 }
 
 type Logger struct {
-	log    *log.Logger
-	level  LogLevel
-	prefix string
-	hooks  []Hook
+	mu    *sync.Mutex
+	cfg   Cfg
+	w     Writer
+	hooks map[string]Hook
 }
 
 // Creates a copy of the logger with the given prefix.
-func (l *Logger) Clone(prefix string, cleanHooks bool) *Logger {
-	newl := *l
-	if cleanHooks {
-		newl.hooks = nil
-	}
-	if prefix != "" {
-		newl.prefix = prefix + " "
-	}
-	return &newl
+func (l *Logger) Clone(prefix string) *Logger {
+	n := Logger{&sync.Mutex{}, l.cfg, l.w, l.hooks}
+	n.cfg.prefix = prefix
+	return &n
 }
 
 // Adds a Hook to the logger.
 func (l *Logger) Add(h Hook) {
-	l.hooks = append(l.hooks, h)
+	l.hooks[h.Id()] = h
 }
 
 // Release an Hook from the logger.
 func (l *Logger) Release(h Hook) {
-	for i, hook := range l.hooks {
-		if hook != h {
-			continue
-		}
-		l.hooks[i], l.hooks = l.hooks[len(l.hooks)-1], l.hooks[:len(l.hooks)-1]
-	}
+	delete(l.hooks, h.Id())
 }
 
 // Writes the log with TRACE level.
 func (l *Logger) Trace(format string, args ...interface{}) {
-	l.output(1, L_TRACE, format, args...)
+	l.output(LvlTrace, format, args...)
 }
 
 // Writes the log with DEBUG level.
 func (l *Logger) Debug(format string, args ...interface{}) {
-	l.output(1, L_DEBUG, format, args...)
+	l.output(LvlDebug, format, args...)
 }
 
 // Writes the log with INFO level.
 func (l *Logger) Info(format string, args ...interface{}) {
-	l.output(1, L_INFO, format, args...)
+	l.output(LvlInfo, format, args...)
 }
 
 // Writes the log with WARN level.
 func (l *Logger) Warn(format string, args ...interface{}) {
-	l.output(1, L_WARN, format, args...)
+	l.output(LvlWarn, format, args...)
 }
 
 // Writes the log with ERROR level.
 func (l *Logger) Error(format string, args ...interface{}) {
-	l.output(1, L_ERROR, format, args...)
+	l.output(LvlError, format, args...)
 }
 
 // Writes the log with PANIC level.
 func (l *Logger) Panic(format string, args ...interface{}) {
-	l.output(1, L_PANIC, format, args...)
+	l.output(LvlPanic, format, args...)
 }
 
 // Writes the log with custom level and depth.
-func (l *Logger) output(depth int, lvl LogLevel, format string, args ...interface{}) {
-	if l.level > lvl {
+func (l *Logger) output(lvl LogLvl, format string, args ...interface{}) {
+	if l.cfg.Lvl > lvl {
 		return
 	}
-	_, file, line, _ := runtime.Caller(1 + depth)
-	fileline := fmt.Sprintf("%s:%d", filepath.Base(file), line)
 	for i := range args {
 		if fn, ok := args[i].(func() string); ok {
 			args[i] = fn()
@@ -124,40 +96,75 @@ func (l *Logger) output(depth int, lvl LogLevel, format string, args ...interfac
 	msg := fmt.Sprintf(format, args...)
 	for _, h := range l.hooks {
 		if h.Match(lvl, format, args...) {
-			h.Action(lvl, fileline, msg)
+			h.Action(lvl, msg)
 		}
 	}
-	l.log.Output(0, fmt.Sprintf(_format, levels[int(lvl)], fileline, l.prefix, msg))
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.writePrefix(lvl)
+	l.w.WriteString(msg)
+	if !strings.HasPrefix(msg, "\n") {
+		l.w.WriteString("\n")
+	}
 }
 
-var defaultLogger = &Logger{log.New(os.Stdout, "", log.LstdFlags), 2, "", nil}
+func (l *Logger) addSpace() {
+	l.w.WriteString(" ")
+}
 
-// Writes the default log with TRACE level.
+func (l *Logger) writePrefix(lvl LogLvl) {
+	if t := l.cfg.Date.fmt(); t != nil {
+		l.w.WriteString(t(time.Now()))
+		l.addSpace()
+	}
+	l.w.WriteString(levels[lvl].GetLabel(l.cfg.Color))
+	l.addSpace()
+	if f := l.cfg.File.fmt(); f != nil {
+		_, name, line, _ := runtime.Caller(3)
+		l.w.WriteString(fmt.Sprintf("[%s:%d]", f(name), line))
+		l.addSpace()
+	}
+	if l.cfg.prefix != "" {
+		l.w.WriteString(l.cfg.prefix)
+		l.addSpace()
+	}
+}
+
+var baseCfg = Cfg{Color: true, Date: DateHour, File: FileShow}
+var defaultLogger = Std()
+
+// Creates a standard Logger on `os.Stdout`.
+func Std() *Logger {
+	l := Logger{&sync.Mutex{}, baseCfg, os.Stdout, make(map[string]Hook)}
+	return &l
+}
+
+// Writes the default log with a Trace level.
 func Trace(format string, args ...interface{}) {
-	defaultLogger.output(1, L_TRACE, format, args...)
+	defaultLogger.output(LvlTrace, format, args...)
 }
 
-// Writes the default log with DEBUG level.
+// Writes the default log with a Debug level.
 func Debug(format string, args ...interface{}) {
-	defaultLogger.output(1, L_DEBUG, format, args...)
+	defaultLogger.output(LvlDebug, format, args...)
 }
 
-// Writes the default log with INFO level.
+// Writes the default log with a Info level.
 func Info(format string, args ...interface{}) {
-	defaultLogger.output(1, L_INFO, format, args...)
+	defaultLogger.output(LvlInfo, format, args...)
 }
 
-// Writes the default log with WARN level.
+// Writes the default log with a Warn level.
 func Warn(format string, args ...interface{}) {
-	defaultLogger.output(1, L_WARN, format, args...)
+	defaultLogger.output(LvlWarn, format, args...)
 }
 
-// Writes the default log with ERROR level.
+// Writes the default log with a Error level.
 func Error(format string, args ...interface{}) {
-	defaultLogger.output(1, L_ERROR, format, args...)
+	defaultLogger.output(LvlError, format, args...)
 }
 
-// Writes the default log with PANIC level.
+// Writes the default log with a Panic level.
 func Panic(format string, args ...interface{}) {
-	defaultLogger.output(1, L_PANIC, format, args...)
+	defaultLogger.output(LvlPanic, format, args...)
 }

@@ -45,6 +45,7 @@ If the message is ignored the function will not be executed.
 ### Hooks
 
 An hook is interface used to capture certain conditions and execute an action.
+
 Here's an example:
 
 	type MailHook struct {
@@ -68,4 +69,4 @@ This hook captures the messages from a certain level and sends an email with the
 
 ## Help
 
-For a complete reference read the [Godoc](http://godoc.org/github.com/klaidliadon/console "Documentation")
+For a complete reference read the [docs](https://godoc.org/gopkg.in/klaidliadon/console.v1 "Godoc").

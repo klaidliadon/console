@@ -1,6 +1,7 @@
 #Console
-[![codecov.io](http://codecov.io/github/klaidliadon/console/coverage.svg?branch=master)](http://codecov.io/github/klaidliadon/console?branch=master)
 [![GoDoc](https://godoc.org/gopkg.in/klaidliadon/console.v1?status.svg)](https://godoc.org/gopkg.in/klaidliadon/console.v1) 
+[![codecov.io](http://codecov.io/github/klaidliadon/console/coverage.svg?branch=master)](http://codecov.io/github/klaidliadon/console?branch=master)
+
 
 Console package implements multi priority logger.
 

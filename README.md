@@ -1,4 +1,6 @@
 #Console
+[![codecov.io](http://codecov.io/github/klaidliadon/console/coverage.svg?branch=master)](http://codecov.io/github/klaidliadon/console?branch=master)
+[![GoDoc](http://godoc.org/gopkg.in/klaidliadon/console.v1?status.png)](http://godoc.org/github.com/klaidliadon/next) 
 
 Console package implements multi priority logger.
 
@@ -69,4 +71,4 @@ This hook captures the messages from a certain level and sends an email with the
 
 ## Help
 
-For a complete reference read the [docs](https://godoc.org/gopkg.in/klaidliadon/console.v1 "Godoc").
+For a complete reference read the [docs](http://godoc.org/gopkg.in/klaidliadon/console.v1 "Godoc").

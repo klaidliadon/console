@@ -59,7 +59,7 @@ const (
 // Logging level
 type LogLvl int
 
-// All the logging levels
+// List of priorities
 const (
 	LvlTrace = LogLvl(iota)
 	LvlDebug
@@ -69,28 +69,28 @@ const (
 	LvlPanic
 )
 
-type lvlDesc struct {
+type desc struct {
 	Label string
 	Color *color.Color
 }
 
-func (l lvlDesc) GetLabel(c bool) string {
+func (l desc) GetLabel(c bool) string {
 	if c {
 		return l.Color.SprintFunc()(l.Label)
 	}
 	return l.Label
 }
 
-var levels = map[LogLvl]lvlDesc{
-	LvlTrace: lvlDesc{"TRACE", color.New(color.FgBlue)},
-	LvlDebug: lvlDesc{"DEBUG", color.New(color.FgCyan)},
-	LvlInfo:  lvlDesc{"INFO ", color.New(color.FgGreen)},
-	LvlWarn:  lvlDesc{"WARN ", color.New(color.FgYellow)},
-	LvlError: lvlDesc{"ERROR", color.New(color.FgRed)},
-	LvlPanic: lvlDesc{"PANIC", color.New(color.FgMagenta)},
+var listOfLvls = map[LogLvl]desc{
+	LvlTrace: desc{"TRACE", color.New(color.FgBlue)},
+	LvlDebug: desc{"DEBUG", color.New(color.FgCyan)},
+	LvlInfo:  desc{"INFO ", color.New(color.FgGreen)},
+	LvlWarn:  desc{"WARN ", color.New(color.FgYellow)},
+	LvlError: desc{"ERROR", color.New(color.FgRed)},
+	LvlPanic: desc{"PANIC", color.New(color.FgMagenta)},
 }
 
-// Holds the configuration of a Logger
+// Holds the configuration of a Console
 type Cfg struct {
 	Date   DateFmt
 	File   FileFmt

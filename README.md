@@ -10,16 +10,16 @@ Console package implements multi priority logger.
 
 ### Basic Usage
 
-The standard log uses `os.Stdout`:
+The standard console uses `os.Stdout`:
 
 	c := console.Std()
 	c.Info("This is console")
 
-### Custom Logger
+### Custom Console
 
 You can define your custom logger and use it:
 
-	// Create a *log.Logger
+	// Create a *console.Console
 	var custom = console.New(console.Cfg{
 		Color: true, 
 		Date: console.DateFull,
@@ -53,19 +53,19 @@ An hook is interface used to capture certain conditions and execute an action.
 Here's an example:
 
 	type MailHook struct {
-		lvl  console.LogLevel
+		lvl  console.Lvl
 		Addr string
 		Auth Auth
 		From string
 		To   []string
 	}
 
-	func (m *MailHook) Match(l console.LogLevel, format string, args ...interface{}) bool {
+	func (m *MailHook) Match(l console.Lvl, format string, args ...interface{}) bool {
 		return l >= m.lvl
 	}
 
-	func (m *MailHook) Action(l LogLevel, msg string){
-		smtp.SendMail(m.Addr, m.Auth, m.From, m.To, fmt.Sprintf("[%s] from MailHook: %s\n\n%s", l, fileline, msg)
+	func (m *MailHook) Action(l console.Lvl, msg string){
+		smtp.SendMail(m.Addr, m.Auth, m.From, m.To, fmt.Sprintf("[%s] from MailHook: %s", l, msg)
 	}
 
 

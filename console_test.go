@@ -81,3 +81,23 @@ func TestClone(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestFullLog(t *testing.T) {
+	l := New(Cfg{Lvl: LvlInfo, Date: DateFull, File: FileFull}, os.Stderr)
+	l.Debug("%s", "a")
+	l.Warn("%s", "a")
+}
+
+func TestPanic(t *testing.T) {
+	testPanic(t, Cfg{Date: DateFmt(10)})
+	testPanic(t, Cfg{File: FileFmt(10)})
+}
+
+func testPanic(t *testing.T, cfg Cfg) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fail()
+		}
+	}()
+	New(cfg, os.Stderr).Error("panic!")
+}

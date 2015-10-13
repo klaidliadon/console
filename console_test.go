@@ -33,10 +33,11 @@ func TestDefault(t *testing.T) {
 // Testing a hook with level error and a function argument
 func TestHook(t *testing.T) {
 	s := SimpleHook{0, LvlError, bytes.NewBuffer(nil)}
-	l := New(Cfg{Lvl: LvlTrace, Color: true}, os.Stdout)
+	l := New(Cfg{Lvl: LvlDebug, Color: true}, os.Stdout)
 	l.Add(&s)
+	l.Trace("mesage ignored by the logger")
 	l.Error("message - %s", func() string { return "args" })
-	l.Panic("ignored")
+	l.Panic("ignored by the hook")
 	if s.String() != "message - args\n" {
 		t.Error("Unexpected string", s)
 	}
@@ -66,5 +67,17 @@ func TestHookRelease(t *testing.T) {
 	l.Release(&s2)
 	if l := len(l.hooks); l != 0 {
 		t.Error("Failed", l)
+	}
+}
+
+func TestClone(t *testing.T) {
+	b := bytes.NewBuffer(nil)
+	l := New(Cfg{Lvl: LvlInfo}, b)
+	c := l.Clone("<prefix>")
+	c.Debug("%s", "a")
+	c.Warn("%s", "a")
+	r := b.String()
+	if exp := "WARN  <prefix> a\n"; r != exp {
+		t.Fail()
 	}
 }

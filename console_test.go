@@ -10,15 +10,15 @@ import (
 // A simple hook that copies in a buffer messages from a certain level.
 type SimpleHook struct {
 	N int
-	LogLvl
+	Lvl
 	*bytes.Buffer
 }
 
 func (s *SimpleHook) Id() string { return fmt.Sprintf("simple-hook-%d", s.N) }
 
-func (s *SimpleHook) Match(l LogLvl, f string, a ...interface{}) bool { return l == s.LogLvl }
+func (s *SimpleHook) Match(l Lvl, f string, a ...interface{}) bool { return l == s.Lvl }
 
-func (s *SimpleHook) Action(l LogLvl, msg string) { s.WriteString(msg + "\n") }
+func (s *SimpleHook) Action(l Lvl, msg string) { s.WriteString(msg + "\n") }
 
 // Testing default functions
 func TestDefault(t *testing.T) {
@@ -28,6 +28,23 @@ func TestDefault(t *testing.T) {
 	Error("error msg")
 	Warn("warn msg")
 	Panic("panic msg")
+}
+
+// Testing std console functions
+func TestStd(t *testing.T) {
+	c := Std()
+	c.Trace("trace msg")
+	c.Debug("debug msg")
+	c.Info("info msg")
+	c.Error("error msg")
+	c.Warn("warn msg")
+	c.Panic("panic msg")
+}
+
+func TestIgnored(t *testing.T) {
+	SetDefaultCfg(Cfg{Lvl: LvlDebug})
+	Trace("ignore msg")
+	Debug("debug msg")
 }
 
 // Testing a hook with level error and a function argument
@@ -72,7 +89,7 @@ func TestHookRelease(t *testing.T) {
 
 func TestClone(t *testing.T) {
 	b := bytes.NewBuffer(nil)
-	l := New(Cfg{Lvl: LvlInfo}, b)
+	l := New(Cfg{Lvl: LvlInfo, Color: true}, b)
 	c := l.Clone("<prefix>")
 	c.Debug("%s", "a")
 	c.Warn("%s", "a")
@@ -82,15 +99,25 @@ func TestClone(t *testing.T) {
 	}
 }
 
-func TestFullLog(t *testing.T) {
-	l := New(Cfg{Lvl: LvlInfo, Date: DateFull, File: FileFull}, os.Stderr)
-	l.Debug("%s", "a")
-	l.Warn("%s", "a")
+func TestFormat(t *testing.T) {
+	var cfgs = []Cfg{
+		Cfg{File: FileHide, Date: DateHide},
+		Cfg{File: FileShow, Date: DateHour},
+		Cfg{File: FileFull, Date: DateFull},
+	}
+	for _, cfg := range cfgs {
+		New(cfg, os.Stdout).Info("test a format")
+	}
 }
 
 func TestPanic(t *testing.T) {
-	testPanic(t, Cfg{Date: DateFmt(10)})
-	testPanic(t, Cfg{File: FileFmt(10)})
+	var cfgs = []Cfg{
+		Cfg{File: FileFmt(10)},
+		Cfg{Date: DateFmt(10)},
+	}
+	for _, cfg := range cfgs {
+		testPanic(t, cfg)
+	}
 }
 
 func testPanic(t *testing.T, cfg Cfg) {
@@ -99,5 +126,5 @@ func testPanic(t *testing.T, cfg Cfg) {
 			t.Fail()
 		}
 	}()
-	New(cfg, os.Stderr).Error("panic!")
+	New(cfg, os.Stdout).Info("this will panic")
 }

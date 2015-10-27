@@ -57,11 +57,11 @@ const (
 )
 
 // Logging level
-type LogLvl int
+type Lvl int
 
 // List of priorities
 const (
-	LvlTrace = LogLvl(iota)
+	LvlTrace = Lvl(iota)
 	LvlDebug
 	LvlInfo
 	LvlWarn
@@ -81,20 +81,20 @@ func (l desc) GetLabel(c bool) string {
 	return l.Label
 }
 
-var listOfLvls = map[LogLvl]desc{
-	LvlTrace: desc{"TRACE", color.New(color.FgBlue)},
-	LvlDebug: desc{"DEBUG", color.New(color.FgCyan)},
-	LvlInfo:  desc{"INFO ", color.New(color.FgGreen)},
-	LvlWarn:  desc{"WARN ", color.New(color.FgYellow)},
-	LvlError: desc{"ERROR", color.New(color.FgRed)},
-	LvlPanic: desc{"PANIC", color.New(color.FgMagenta)},
+var levels = map[Lvl]desc{
+	LvlTrace: desc{"TRACE", color.New(color.FgHiBlue)},
+	LvlDebug: desc{"DEBUG", color.New(color.FgHiCyan)},
+	LvlInfo:  desc{"INFO ", color.New(color.FgHiGreen)},
+	LvlWarn:  desc{"WARN ", color.New(color.FgHiYellow)},
+	LvlError: desc{"ERROR", color.New(color.FgHiRed)},
+	LvlPanic: desc{"PANIC", color.New(color.FgHiMagenta)},
 }
 
 // Holds the configuration of a Console
 type Cfg struct {
 	Date   DateFmt
 	File   FileFmt
-	Lvl    LogLvl
+	Lvl    Lvl
 	Color  bool
 	prefix string
 }

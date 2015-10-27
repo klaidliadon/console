@@ -7,16 +7,24 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fatih/color"
 )
+
+// Changes the configuration of default console, used for the following functions:
+// Trace, Debug, Info, Warning, Error, Panic
+func SetDefaultCfg(c Cfg) {
+	defaultConsole.cfg = c
+}
 
 // A hook intercepts log message and perform certain tasks, like sending email
 type Hook interface {
 	// Unique Id to identify Hook
 	Id() string
 	// Action performed by the Hook.
-	Action(l LogLvl, msg string)
+	Action(l Lvl, msg string)
 	// Condition that triggers the Hook.
-	Match(l LogLvl, format string, args ...interface{}) bool
+	Match(l Lvl, format string, args ...interface{}) bool
 }
 
 // A Writer implements the WriteString method, as the os.File
@@ -84,7 +92,7 @@ func (l *Console) Panic(format string, args ...interface{}) {
 }
 
 // Writes the log with custom level and depth.
-func (l *Console) output(lvl LogLvl, format string, args ...interface{}) {
+func (l *Console) output(lvl Lvl, format string, args ...interface{}) {
 	if l.cfg.Lvl > lvl {
 		return
 	}
@@ -102,6 +110,9 @@ func (l *Console) output(lvl LogLvl, format string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.writePrefix(lvl)
+	if l.cfg.Color {
+		msg = white(msg)
+	}
 	l.w.WriteString(msg)
 	if !strings.HasPrefix(msg, "\n") {
 		l.w.WriteString("\n")
@@ -112,20 +123,31 @@ func (l *Console) addSpace() {
 	l.w.WriteString(" ")
 }
 
-func (l *Console) writePrefix(lvl LogLvl) {
+var gray = color.New(color.FgHiBlack).SprintFunc()
+var white = color.New(color.FgHiWhite).SprintFunc()
+
+func (l *Console) writePrefix(lvl Lvl) {
 	if t := l.cfg.Date.fmt(); t != nil {
 		l.w.WriteString(t(time.Now()))
 		l.addSpace()
 	}
-	l.w.WriteString(listOfLvls[lvl].GetLabel(l.cfg.Color))
+	l.w.WriteString(levels[lvl].GetLabel(l.cfg.Color))
 	l.addSpace()
 	if f := l.cfg.File.fmt(); f != nil {
 		_, name, line, _ := runtime.Caller(3)
-		l.w.WriteString(fmt.Sprintf("[%s:%d]", f(name), line))
+		fl := fmt.Sprintf("[%s:%d]", f(name), line)
+		if l.cfg.Color {
+			fl = gray(fl)
+		}
+		l.w.WriteString(fl)
 		l.addSpace()
 	}
 	if l.cfg.prefix != "" {
-		l.w.WriteString(l.cfg.prefix)
+		p := l.cfg.prefix
+		if l.cfg.Color {
+			p = levels[lvl].Color.SprintFunc()(p)
+		}
+		l.w.WriteString(p)
 		l.addSpace()
 	}
 }

@@ -89,14 +89,15 @@ func TestHookRelease(t *testing.T) {
 
 func TestClone(t *testing.T) {
 	b := bytes.NewBuffer(nil)
-	l := New(Cfg{Lvl: LvlInfo, Color: true}, b)
+	l := New(Cfg{Lvl: LvlInfo}, b)
 	c := l.Clone("<prefix>")
 	c.Debug("%s", "a")
 	c.Warn("%s", "a")
 	r := b.String()
 	if exp := "WARN  <prefix> a\n"; r != exp {
-		t.Fail()
+		t.Errorf("Want %q, got %q", exp, r)
 	}
+	Std().Clone("prefix").Info("format")
 }
 
 func TestFormat(t *testing.T) {

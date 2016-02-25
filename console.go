@@ -1,7 +1,9 @@
 package console
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -9,6 +11,11 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+)
+
+var (
+	gray  = color.New(color.FgHiBlack).SprintFunc()
+	white = color.New(color.FgHiWhite).SprintFunc()
 )
 
 // Changes the configuration of default console, used for the following functions:
@@ -29,6 +36,7 @@ type Hook interface {
 
 // A Writer implements the WriteString method, as the os.File
 type Writer interface {
+	io.Writer
 	WriteString(string) (int, error)
 }
 
@@ -107,48 +115,39 @@ func (l *Console) output(lvl Lvl, format string, args ...interface{}) {
 			h.Action(lvl, msg)
 		}
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.writePrefix(lvl)
+	b := bytes.NewBuffer(nil)
+	l.writePrefix(b, lvl)
 	if l.cfg.Color {
 		msg = white(msg)
 	}
-	l.w.WriteString(msg)
+	b.WriteString(msg)
 	if !strings.HasPrefix(msg, "\n") {
-		l.w.WriteString("\n")
+		b.WriteString("\n")
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	io.Copy(l.w, b)
 }
 
-func (l *Console) addSpace() {
-	l.w.WriteString(" ")
-}
-
-var gray = color.New(color.FgHiBlack).SprintFunc()
-var white = color.New(color.FgHiWhite).SprintFunc()
-
-func (l *Console) writePrefix(lvl Lvl) {
+func (l *Console) writePrefix(b Writer, lvl Lvl) {
 	if t := l.cfg.Date.fmt(); t != nil {
-		l.w.WriteString(t(time.Now()))
-		l.addSpace()
+		b.WriteString(t(time.Now()) + " ")
 	}
-	l.w.WriteString(levels[lvl].GetLabel(l.cfg.Color))
-	l.addSpace()
+	b.WriteString(levels[lvl].GetLabel(l.cfg.Color) + " ")
 	if f := l.cfg.File.fmt(); f != nil {
 		_, name, line, _ := runtime.Caller(3)
 		fl := fmt.Sprintf("[%s:%d]", f(name), line)
 		if l.cfg.Color {
 			fl = gray(fl)
 		}
-		l.w.WriteString(fl)
-		l.addSpace()
+		b.WriteString(fl + " ")
 	}
 	if l.cfg.prefix != "" {
 		p := l.cfg.prefix
 		if l.cfg.Color {
 			p = levels[lvl].Color.SprintFunc()(p)
 		}
-		l.w.WriteString(p)
-		l.addSpace()
+		b.WriteString(p + " ")
 	}
 }
 

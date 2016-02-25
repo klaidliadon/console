@@ -29,9 +29,9 @@ type Hook interface {
 	// Unique Id to identify Hook
 	Id() string
 	// Action performed by the Hook.
-	Action(l Lvl, msg string)
+	Action(l Lvl, msg, format string, args ...interface{})
 	// Condition that triggers the Hook.
-	Match(l Lvl, format string, args ...interface{}) bool
+	Match(l Lvl, msg, format string, args ...interface{}) bool
 }
 
 // A Writer implements the WriteString method, as the os.File
@@ -54,18 +54,27 @@ type Console struct {
 
 // Creates a copy of the logger with the given prefix.
 func (l *Console) Clone(prefix string) *Console {
-	n := Console{&sync.Mutex{}, l.cfg, l.w, l.hooks}
+	n := Console{
+		mu:    l.mu,
+		cfg:   l.cfg,
+		w:     l.w,
+		hooks: l.hooks,
+	}
 	n.cfg.prefix = prefix
 	return &n
 }
 
 // Adds a Hook to the logger.
 func (l *Console) Add(h Hook) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.hooks[h.Id()] = h
 }
 
 // Release an Hook from the logger.
 func (l *Console) Release(h Hook) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	delete(l.hooks, h.Id())
 }
 
@@ -110,11 +119,7 @@ func (l *Console) output(lvl Lvl, format string, args ...interface{}) {
 		}
 	}
 	msg := fmt.Sprintf(format, args...)
-	for _, h := range l.hooks {
-		if h.Match(lvl, format, args...) {
-			h.Action(lvl, msg)
-		}
-	}
+	l.executeHooks(lvl, msg, format, args...)
 	b := bytes.NewBuffer(nil)
 	l.writePrefix(b, lvl)
 	if l.cfg.Color {
@@ -127,6 +132,16 @@ func (l *Console) output(lvl Lvl, format string, args ...interface{}) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	io.Copy(l.w, b)
+}
+
+func (l *Console) executeHooks(lvl Lvl, msg, format string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, h := range l.hooks {
+		if h.Match(lvl, msg, format, args...) {
+			h.Action(lvl, msg, format, args...)
+		}
+	}
 }
 
 func (l *Console) writePrefix(b Writer, lvl Lvl) {

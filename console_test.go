@@ -16,9 +16,9 @@ type SimpleHook struct {
 
 func (s *SimpleHook) Id() string { return fmt.Sprintf("simple-hook-%d", s.N) }
 
-func (s *SimpleHook) Match(l Lvl, f string, a ...interface{}) bool { return l == s.Lvl }
+func (s *SimpleHook) Match(l Lvl, msg, f string, a ...interface{}) bool { return l == s.Lvl }
 
-func (s *SimpleHook) Action(l Lvl, msg string) { s.WriteString(msg + "\n") }
+func (s *SimpleHook) Action(l Lvl, msg, f string, a ...interface{}) { s.WriteString(msg + "\n") }
 
 // Testing default functions
 func TestDefault(t *testing.T) {

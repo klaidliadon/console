@@ -1,21 +1,14 @@
 package console
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/fatih/color"
 )
-
-func init() {
-	Defaults.validate()
-}
 
 var (
 	gray  = color.New(color.FgHiBlack).SprintFunc()
@@ -65,6 +58,7 @@ type Console struct {
 // Clone creates a copy of the console with the given prefix.
 func (c Console) Clone(prefix string) *Console {
 	c.cfg.prefix = prefix
+	c.cfg.validate()
 	return &c
 }
 
@@ -124,18 +118,12 @@ func (c *Console) print(lvl Lvl, format string, args ...interface{}) {
 	}
 	msg := fmt.Sprintf(format, args...)
 	c.executeHooks(lvl, msg, format, args...)
-	b := bytes.NewBuffer(nil)
-	c.writePrefix(b, lvl)
-	if c.cfg.Color {
-		msg = white(msg)
-	}
-	b.WriteString(msg)
-	if !strings.HasPrefix(msg, "\n") {
-		b.WriteString("\n")
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	io.Copy(c.w, b)
+	c.w.WriteString(fmt.Sprintf(c.cfg.fmt, c.cfg.args(lvl, msg)...))
+	if !strings.HasSuffix(msg, "\n") {
+		c.w.Write([]byte{'\n'})
+	}
 }
 
 func (c *Console) executeHooks(lvl Lvl, msg, format string, args ...interface{}) {
@@ -145,28 +133,6 @@ func (c *Console) executeHooks(lvl Lvl, msg, format string, args ...interface{})
 		if h.Match(lvl, msg, format, args...) {
 			h.Action(lvl, msg, format, args...)
 		}
-	}
-}
-
-func (c *Console) writePrefix(b Writer, lvl Lvl) {
-	if t := c.cfg.fmt.date; t != nil {
-		b.WriteString(t(time.Now()) + " ")
-	}
-	b.WriteString(levels[lvl].Label(c.cfg.Color) + " ")
-	if f := c.cfg.fmt.file; f != nil {
-		_, name, line, _ := runtime.Caller(3)
-		fl := fmt.Sprintf("[%s:%d]", f(name), line)
-		if c.cfg.Color {
-			fl = gray(fl)
-		}
-		b.WriteString(fl + " ")
-	}
-	if c.cfg.prefix != "" {
-		p := c.cfg.prefix
-		if c.cfg.Color {
-			p = levels[lvl].Color(p)
-		}
-		b.WriteString(p + " ")
 	}
 }
 
@@ -181,9 +147,11 @@ var defaultConsole = Std()
 
 // Std creates a standard Console on `os.Stdout`.
 func Std() *Console {
+	c := Defaults
+	c.validate()
 	return &Console{
 		mu:    new(sync.Mutex),
-		cfg:   Defaults,
+		cfg:   c,
 		w:     os.Stdout,
 		hooks: make(map[string]Hook),
 	}

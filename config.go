@@ -1,7 +1,9 @@
 package console
 
 import (
+	"bytes"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/fatih/color"
@@ -101,13 +103,59 @@ type Cfg struct {
 	Lvl    Lvl
 	Color  bool
 	prefix string
-	fmt    struct {
+	fn     struct {
 		date func(time.Time) string
 		file func(string) string
 	}
+	fmt string
+}
+
+func (c *Cfg) Label(l Lvl) string {
+	return levels[l].Label(c.Color)
 }
 
 func (c *Cfg) validate() {
-	c.fmt.date = c.Date.fmt()
-	c.fmt.file = c.File.fmt()
+	c.fn.date = c.Date.fmt()
+	c.fn.file = c.File.fmt()
+	b := bytes.NewBuffer(nil)
+	if c.fn.date != nil {
+		s := "%s "
+		if c.Color {
+			s = white(s)
+		}
+		b.WriteString(s)
+	}
+	b.WriteString("%s ")
+	if c.fn.file != nil {
+		fl := "[%s:%d]"
+		if c.Color {
+			fl = gray(fl)
+		}
+		b.WriteString(fl + " ")
+	}
+	if c.prefix != "" {
+		b.WriteString("%s ")
+	}
+	b.WriteString("%s")
+	c.fmt = b.String()
+}
+
+func (c *Cfg) args(l Lvl, msg string) []interface{} {
+	var args = make([]interface{}, 0, 4)
+	if t := c.fn.date; t != nil {
+		args = append(args, t(time.Now()))
+	}
+	args = append(args, c.Label(l))
+	if f := c.fn.file; f != nil {
+		_, name, line, _ := runtime.Caller(3)
+		args = append(args, f(name), line)
+	}
+	if c.prefix != "" {
+		p := c.prefix
+		if c.Color {
+			p = levels[l].Color(p)
+		}
+		args = append(args, p)
+	}
+	return append(args, msg)
 }

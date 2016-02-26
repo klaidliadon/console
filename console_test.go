@@ -16,9 +16,9 @@ type SimpleHook struct {
 
 func (s *SimpleHook) Id() string { return fmt.Sprintf("simple-hook-%d", s.N) }
 
-func (s *SimpleHook) Match(l Lvl, msg, f string, a ...interface{}) bool { return l == s.Lvl }
+func (s *SimpleHook) Match(l Lvl, _, _ string, _ ...interface{}) bool { return l == s.Lvl }
 
-func (s *SimpleHook) Action(l Lvl, msg, f string, a ...interface{}) { s.WriteString(msg + "\n") }
+func (s *SimpleHook) Action(_ Lvl, msg, _ string, _ ...interface{}) { s.WriteString(msg + "\n") }
 
 // Testing default functions
 func TestDefault(t *testing.T) {
@@ -91,20 +91,25 @@ func TestClone(t *testing.T) {
 	b := bytes.NewBuffer(nil)
 	l := New(Cfg{Lvl: LvlInfo}, b)
 	c := l.Clone("<prefix>")
+	if l.cfg.prefix == c.cfg.prefix {
+		t.Errorf("Prefix changed for original log")
+	}
 	c.Debug("%s", "a")
 	c.Warn("%s", "a")
 	r := b.String()
 	if exp := "WARN  <prefix> a\n"; r != exp {
 		t.Errorf("Want %q, got %q", exp, r)
 	}
+	l.Debug("%s", "a")
+	l.Warn("%s", "a")
 	Std().Clone("prefix").Info("format")
 }
 
 func TestFormat(t *testing.T) {
 	var cfgs = []Cfg{
-		Cfg{File: FileHide, Date: DateHide},
-		Cfg{File: FileShow, Date: DateHour},
-		Cfg{File: FileFull, Date: DateFull},
+		Cfg{Color: true, File: FileHide, Date: DateHide},
+		Cfg{Color: true, File: FileShow, Date: DateHour},
+		Cfg{Color: true, File: FileFull, Date: DateFull},
 	}
 	for _, cfg := range cfgs {
 		New(cfg, os.Stdout).Info("test a format")
@@ -128,4 +133,32 @@ func testPanic(t *testing.T, cfg Cfg) {
 		}
 	}()
 	New(cfg, os.Stdout).Info("this will panic")
+}
+
+type null struct{}
+
+func (null) Write(p []byte) (n int, err error)       { return 0, nil }
+func (null) WriteString(s string) (n int, err error) { return 0, nil }
+
+func BenchmarkPlain(b *testing.B) {
+	c := New(Cfg{}, null{})
+	for n := 0; n < b.N; n++ {
+		c.Info("msg %v", n)
+	}
+}
+
+func BenchmarkStd(b *testing.B) {
+	c := New(Defaults, null{})
+	for n := 0; n < b.N; n++ {
+		c.Info("msg %v", n)
+	}
+}
+
+func BenchmarkStdNoColor(b *testing.B) {
+	var cfg = Defaults
+	cfg.Color = false
+	c := New(cfg, null{})
+	for n := 0; n < b.N; n++ {
+		c.Info("msg %v", n)
+	}
 }

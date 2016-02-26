@@ -1,10 +1,15 @@
-#Console
+# Welcome
 [![GoDoc](https://godoc.org/gopkg.in/klaidliadon/console.v1?status.svg)](https://godoc.org/gopkg.in/klaidliadon/console.v1)
 [![Build Status](https://travis-ci.org/klaidliadon/console.svg)](https://travis-ci.org/klaidliadon/console)
 [![codecov.io](http://codecov.io/github/klaidliadon/console/coverage.svg?branch=master)](http://codecov.io/github/klaidliadon/console?branch=master)
 
+Console is a logger package for Go with the following features:
 
-Console package implements multi priority logger.
+- Multiple priorities
+- Fully configurable
+- Thread safe
+- Runtime execution of `func() string` arguments
+- Introduces `Hooks` that can match some messages and reply with some actions.
 
 ## Usage
 
@@ -66,6 +71,7 @@ Here's an example:
 
 ```go
 type Mailer struct {
+	Id   int64
 	lvl  console.Lvl
 	Addr string
 	Auth smtp.Auth
@@ -73,11 +79,15 @@ type Mailer struct {
 	To   []string
 }
 
-func (m Mailer) Match(l console.Lvl, format string, args ...interface{}) bool {
-	return l >= m.lvl
+func (m Mailer) Id() string {
+	return fmt.Sprintf("mailer-hook-%d", m.Id) 
 }
 
-func (m Mailer) Action(l console.Lvl, msg string){
+func (m Mailer) Match(l Lvl, _, _ string, _ ...interface{}) bool { 
+	return l == s.Lvl
+}
+
+func (m Mailer) Action(l Lvl, msg, _ string, _ ...interface{}) { 
 	smtp.SendMail(m.Addr, m.Auth, m.From, m.To, fmt.Sprintf("[%s] from MailHook: %s", l, msg)
 }
 ```

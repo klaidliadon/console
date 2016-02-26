@@ -70,24 +70,28 @@ const (
 )
 
 type desc struct {
-	Label string
-	Color *color.Color
+	label string
+	Color func(...interface{}) string
 }
 
-func (l desc) GetLabel(c bool) string {
+func (l desc) Label(c bool) string {
 	if c {
-		return l.Color.SprintFunc()(l.Label)
+		return l.Color(l.label)
 	}
-	return l.Label
+	return l.label
+}
+
+func newDesc(s string, c *color.Color) desc {
+	return desc{s, c.SprintFunc()}
 }
 
 var levels = map[Lvl]desc{
-	LvlTrace: desc{"TRACE", color.New(color.FgHiBlue)},
-	LvlDebug: desc{"DEBUG", color.New(color.FgHiCyan)},
-	LvlInfo:  desc{"INFO ", color.New(color.FgHiGreen)},
-	LvlWarn:  desc{"WARN ", color.New(color.FgHiYellow)},
-	LvlError: desc{"ERROR", color.New(color.FgHiRed)},
-	LvlPanic: desc{"PANIC", color.New(color.FgHiMagenta)},
+	LvlTrace: newDesc("TRACE", color.New(color.FgHiBlue)),
+	LvlDebug: newDesc("DEBUG", color.New(color.FgHiCyan)),
+	LvlInfo:  newDesc("INFO ", color.New(color.FgHiGreen)),
+	LvlWarn:  newDesc("WARN ", color.New(color.FgHiYellow)),
+	LvlError: newDesc("ERROR", color.New(color.FgHiRed)),
+	LvlPanic: newDesc("PANIC", color.New(color.FgHiMagenta)),
 }
 
 // Holds the configuration of a Console
@@ -97,4 +101,13 @@ type Cfg struct {
 	Lvl    Lvl
 	Color  bool
 	prefix string
+	fmt    struct {
+		date func(time.Time) string
+		file func(string) string
+	}
+}
+
+func (c *Cfg) validate() {
+	c.fmt.date = c.Date.fmt()
+	c.fmt.file = c.File.fmt()
 }

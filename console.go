@@ -13,18 +13,22 @@ import (
 	"github.com/fatih/color"
 )
 
+func init() {
+	Defaults.validate()
+}
+
 var (
 	gray  = color.New(color.FgHiBlack).SprintFunc()
 	white = color.New(color.FgHiWhite).SprintFunc()
 )
 
-// Changes the configuration of default console, used for the following functions:
-// Trace, Debug, Info, Warning, Error, Panic
+// SetDefaultCfg changes the configuration of default console, used by Trace, Debug, Info, Warning, Error, Panic
 func SetDefaultCfg(c Cfg) {
+	c.validate()
 	defaultConsole.cfg = c
 }
 
-// A hook intercepts log message and perform certain tasks, like sending email
+// Hook intercepts log message and perform certain tasks, like sending email
 type Hook interface {
 	// Unique Id to identify Hook
 	Id() string
@@ -34,15 +38,21 @@ type Hook interface {
 	Match(l Lvl, msg, format string, args ...interface{}) bool
 }
 
-// A Writer implements the WriteString method, as the os.File
+// Writer implements the WriteString method, as the os.File
 type Writer interface {
 	io.Writer
 	WriteString(string) (int, error)
 }
 
-// Creates a Console.
-func New(cfg Cfg, w Writer) *Console {
-	return &Console{&sync.Mutex{}, cfg, w, make(map[string]Hook)}
+// New creates a Console.
+func New(c Cfg, w Writer) *Console {
+	c.validate()
+	return &Console{
+		mu:    &sync.Mutex{},
+		cfg:   c,
+		w:     w,
+		hooks: make(map[string]Hook),
+	}
 }
 
 type Console struct {
@@ -52,65 +62,59 @@ type Console struct {
 	hooks map[string]Hook
 }
 
-// Creates a copy of the logger with the given prefix.
-func (l *Console) Clone(prefix string) *Console {
-	n := Console{
-		mu:    l.mu,
-		cfg:   l.cfg,
-		w:     l.w,
-		hooks: l.hooks,
-	}
-	n.cfg.prefix = prefix
-	return &n
+// Clone creates a copy of the console with the given prefix.
+func (c Console) Clone(prefix string) *Console {
+	c.cfg.prefix = prefix
+	return &c
 }
 
 // Adds a Hook to the logger.
-func (l *Console) Add(h Hook) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.hooks[h.Id()] = h
+func (c *Console) Add(h Hook) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.hooks[h.Id()] = h
 }
 
 // Release an Hook from the logger.
-func (l *Console) Release(h Hook) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	delete(l.hooks, h.Id())
+func (c *Console) Release(h Hook) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.hooks, h.Id())
 }
 
-// Writes the log with TRACE level.
-func (l *Console) Trace(format string, args ...interface{}) {
-	l.output(LvlTrace, format, args...)
+// Trace writes the console with LvlTrace.
+func (c *Console) Trace(format string, args ...interface{}) {
+	c.print(LvlTrace, format, args...)
 }
 
-// Writes the log with DEBUG level.
-func (l *Console) Debug(format string, args ...interface{}) {
-	l.output(LvlDebug, format, args...)
+// Debug writes the console with LvlDebug.
+func (c *Console) Debug(format string, args ...interface{}) {
+	c.print(LvlDebug, format, args...)
 }
 
-// Writes the log with INFO level.
-func (l *Console) Info(format string, args ...interface{}) {
-	l.output(LvlInfo, format, args...)
+// Info writes the console with LvlInfo.
+func (c *Console) Info(format string, args ...interface{}) {
+	c.print(LvlInfo, format, args...)
 }
 
-// Writes the log with WARN level.
-func (l *Console) Warn(format string, args ...interface{}) {
-	l.output(LvlWarn, format, args...)
+// Warn writes the console with LvlWarn.
+func (c *Console) Warn(format string, args ...interface{}) {
+	c.print(LvlWarn, format, args...)
 }
 
-// Writes the log with ERROR level.
-func (l *Console) Error(format string, args ...interface{}) {
-	l.output(LvlError, format, args...)
+// Error writes the console with LvlError.
+func (c *Console) Error(format string, args ...interface{}) {
+	c.print(LvlError, format, args...)
 }
 
-// Writes the log with PANIC level.
-func (l *Console) Panic(format string, args ...interface{}) {
-	l.output(LvlPanic, format, args...)
+// Panic writes the console with LvlPanic.
+func (c *Console) Panic(format string, args ...interface{}) {
+	c.print(LvlPanic, format, args...)
 }
 
-// Writes the log with custom level and depth.
-func (l *Console) output(lvl Lvl, format string, args ...interface{}) {
-	if l.cfg.Lvl > lvl {
+// print writes the log with custom level and depth.
+func (c *Console) print(lvl Lvl, format string, args ...interface{}) {
+	if c.cfg.Lvl > lvl {
 		return
 	}
 	for i := range args {
@@ -119,88 +123,98 @@ func (l *Console) output(lvl Lvl, format string, args ...interface{}) {
 		}
 	}
 	msg := fmt.Sprintf(format, args...)
-	l.executeHooks(lvl, msg, format, args...)
+	c.executeHooks(lvl, msg, format, args...)
 	b := bytes.NewBuffer(nil)
-	l.writePrefix(b, lvl)
-	if l.cfg.Color {
+	c.writePrefix(b, lvl)
+	if c.cfg.Color {
 		msg = white(msg)
 	}
 	b.WriteString(msg)
 	if !strings.HasPrefix(msg, "\n") {
 		b.WriteString("\n")
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	io.Copy(l.w, b)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	io.Copy(c.w, b)
 }
 
-func (l *Console) executeHooks(lvl Lvl, msg, format string, args ...interface{}) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	for _, h := range l.hooks {
+func (c *Console) executeHooks(lvl Lvl, msg, format string, args ...interface{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, h := range c.hooks {
 		if h.Match(lvl, msg, format, args...) {
 			h.Action(lvl, msg, format, args...)
 		}
 	}
 }
 
-func (l *Console) writePrefix(b Writer, lvl Lvl) {
-	if t := l.cfg.Date.fmt(); t != nil {
+func (c *Console) writePrefix(b Writer, lvl Lvl) {
+	if t := c.cfg.fmt.date; t != nil {
 		b.WriteString(t(time.Now()) + " ")
 	}
-	b.WriteString(levels[lvl].GetLabel(l.cfg.Color) + " ")
-	if f := l.cfg.File.fmt(); f != nil {
+	b.WriteString(levels[lvl].Label(c.cfg.Color) + " ")
+	if f := c.cfg.fmt.file; f != nil {
 		_, name, line, _ := runtime.Caller(3)
 		fl := fmt.Sprintf("[%s:%d]", f(name), line)
-		if l.cfg.Color {
+		if c.cfg.Color {
 			fl = gray(fl)
 		}
 		b.WriteString(fl + " ")
 	}
-	if l.cfg.prefix != "" {
-		p := l.cfg.prefix
-		if l.cfg.Color {
-			p = levels[lvl].Color.SprintFunc()(p)
+	if c.cfg.prefix != "" {
+		p := c.cfg.prefix
+		if c.cfg.Color {
+			p = levels[lvl].Color(p)
 		}
 		b.WriteString(p + " ")
 	}
 }
 
-var baseCfg = Cfg{Color: true, Date: DateHour, File: FileShow}
+// Defaults is the configuration for standard console
+var Defaults = Cfg{
+	Color: true,
+	Date:  DateHour,
+	File:  FileShow,
+}
+
 var defaultConsole = Std()
 
-// Creates a standard Console on `os.Stdout`.
+// Std creates a standard Console on `os.Stdout`.
 func Std() *Console {
-	l := Console{&sync.Mutex{}, baseCfg, os.Stdout, make(map[string]Hook)}
-	return &l
+	return &Console{
+		mu:    new(sync.Mutex),
+		cfg:   Defaults,
+		w:     os.Stdout,
+		hooks: make(map[string]Hook),
+	}
 }
 
-// Writes the default log with a Trace level.
+// Trace writes the default console with LvlTrace.
 func Trace(format string, args ...interface{}) {
-	defaultConsole.output(LvlTrace, format, args...)
+	defaultConsole.print(LvlTrace, format, args...)
 }
 
-// Writes the default log with a Debug level.
+// Debug writes the default console with LvlDebug.
 func Debug(format string, args ...interface{}) {
-	defaultConsole.output(LvlDebug, format, args...)
+	defaultConsole.print(LvlDebug, format, args...)
 }
 
-// Writes the default log with a Info level.
+// Info writes the default console with LvlInfo.
 func Info(format string, args ...interface{}) {
-	defaultConsole.output(LvlInfo, format, args...)
+	defaultConsole.print(LvlInfo, format, args...)
 }
 
-// Writes the default log with a Warn level.
+// Warn writes the default console with LvlWarn.
 func Warn(format string, args ...interface{}) {
-	defaultConsole.output(LvlWarn, format, args...)
+	defaultConsole.print(LvlWarn, format, args...)
 }
 
-// Writes the default log with a Error level.
+// Error writes the default console with LvlError.
 func Error(format string, args ...interface{}) {
-	defaultConsole.output(LvlError, format, args...)
+	defaultConsole.print(LvlError, format, args...)
 }
 
-// Writes the default log with a Panic level.
+// Panic writes the default console with LvlPanic.
 func Panic(format string, args ...interface{}) {
-	defaultConsole.output(LvlPanic, format, args...)
+	defaultConsole.print(LvlPanic, format, args...)
 }

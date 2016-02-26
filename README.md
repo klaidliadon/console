@@ -1,4 +1,3 @@
-# Welcome
 [![GoDoc](https://godoc.org/gopkg.in/klaidliadon/console.v1?status.svg)](https://godoc.org/gopkg.in/klaidliadon/console.v1)
 [![Build Status](https://travis-ci.org/klaidliadon/console.svg)](https://travis-ci.org/klaidliadon/console)
 [![codecov.io](http://codecov.io/github/klaidliadon/console/coverage.svg?branch=master)](http://codecov.io/github/klaidliadon/console?branch=master)
@@ -13,14 +12,13 @@ Console is a logger package for Go with the following features:
 
 ## Usage
 
-It's recommended to use `gopkg.in` to ensure to use a stable version.
+It's recommended to use `gopkg.in` to use a stable version.
 
 ```go
 import (
 	"gopkg.in/klaidliadon/console.v1"
 )
 ```
-
 
 ### Basic Usage
 

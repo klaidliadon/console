@@ -2,26 +2,17 @@ package console
 
 import (
 	"bytes"
-	"fmt"
 	"os"
-	"testing"
+
+	. "gopkg.in/check.v1"
 )
 
-// A simple hook that copies in a buffer messages from a certain level.
-type SimpleHook struct {
-	N int
-	Lvl
-	*bytes.Buffer
-}
+var _ = Suite(ConsoleSuite{})
 
-func (s *SimpleHook) Id() string { return fmt.Sprintf("simple-hook-%d", s.N) }
+type ConsoleSuite struct{}
 
-func (s *SimpleHook) Match(l Lvl, _, _ string, _ ...interface{}) bool { return l == s.Lvl }
-
-func (s *SimpleHook) Action(_ Lvl, msg, _ string, _ ...interface{}) { s.WriteString(msg + "\n") }
-
-// Testing default functions
-func TestDefault(t *testing.T) {
+func (s ConsoleSuite) TestDefault(c *C) {
+	SetDefaultCfg(Cfg{})
 	Trace("trace msg")
 	Debug("debug msg")
 	Info("info msg")
@@ -30,82 +21,61 @@ func TestDefault(t *testing.T) {
 	Panic("panic msg")
 }
 
-// Testing std console functions
-func TestStd(t *testing.T) {
-	c := Std()
-	c.Trace("trace msg")
-	c.Debug("debug msg")
-	c.Info("info msg")
-	c.Error("error msg")
-	c.Warn("warn msg")
-	c.Panic("panic msg")
+func (s ConsoleSuite) TestIgnored(c *C) {
+	b := bytes.NewBuffer(nil)
+	console := New(Cfg{Lvl: LvlDebug}, b)
+	console.Trace("ignore msg")
+	c.Assert(b.Len(), Equals, 0)
+	console.Debug("debug msg")
+	c.Assert(b.Len(), Not(Equals), 0)
 }
 
-func TestIgnored(t *testing.T) {
-	SetDefaultCfg(Cfg{Lvl: LvlDebug})
-	Trace("ignore msg")
-	Debug("debug msg")
-}
-
-// Testing a hook with level error and a function argument
-func TestHook(t *testing.T) {
-	s := SimpleHook{0, LvlError, bytes.NewBuffer(nil)}
+func (s ConsoleSuite) TestHook(c *C) {
+	h := SimpleHook{0, LvlError, bytes.NewBuffer(nil)}
 	l := New(Cfg{Lvl: LvlDebug, Color: true}, os.Stdout)
-	l.Add(&s)
+	l.Add(&h)
 	l.Trace("mesage ignored by the logger")
 	l.Error("message - %s", func() string { return "args" })
 	l.Panic("ignored by the hook")
-	if s.String() != "message - args\n" {
-		t.Error("Unexpected string", s)
-	}
+	c.Assert(h.String(), Equals, "message - args")
 }
 
-func TestFunction(t *testing.T) {
-	s := SimpleHook{0, LvlInfo, bytes.NewBuffer(nil)}
+func (s ConsoleSuite) TestFunction(c *C) {
+	h := SimpleHook{0, LvlInfo, bytes.NewBuffer(nil)}
+	v := "text\n"
 	l := Std()
-	l.Add(&s)
-	l.Info("%s", func() string { return "x_x_x" })
-	if s.String() != "x_x_x\n" {
-		t.Error("Unexpected string")
-	}
+	l.Add(&h)
+	l.Info("%s", func() string { return v })
+	c.Assert(h.String(), Equals, v)
 }
 
-func TestHookRelease(t *testing.T) {
-	s1 := SimpleHook{1, LvlInfo, bytes.NewBuffer(nil)}
-	s2 := SimpleHook{2, LvlInfo, bytes.NewBuffer(nil)}
+func (s ConsoleSuite) TestHookRelease(c *C) {
+	h1 := SimpleHook{1, LvlInfo, bytes.NewBuffer(nil)}
+	h2 := SimpleHook{2, LvlInfo, bytes.NewBuffer(nil)}
 	l := New(Cfg{Lvl: LvlTrace, Color: true}, os.Stdout)
-	l.Add(&s1)
-	l.Add(&s2)
-	l.Trace("%s", func() string { return "x_x_x" })
-	l.Release(&s1)
-	if l := len(l.hooks); l != 1 {
-		t.Error("Failed", l)
-	}
-	l.Release(&s2)
-	if l := len(l.hooks); l != 0 {
-		t.Error("Failed", l)
-	}
+	l.Add(&h1)
+	l.Add(&h2)
+	c.Assert(l.hooks, HasLen, 2)
+	l.Release(&h1)
+	c.Assert(l.hooks, HasLen, 1)
+	l.Release(&h2)
+	c.Assert(l.hooks, HasLen, 0)
 }
 
-func TestClone(t *testing.T) {
+func (s ConsoleSuite) TestClone(c *C) {
 	b := bytes.NewBuffer(nil)
 	l := New(Cfg{Lvl: LvlInfo}, b)
-	c := l.Clone("<prefix>")
-	if l.cfg.prefix == c.cfg.prefix {
-		t.Errorf("Prefix changed for original log")
-	}
-	c.Debug("%s", "a")
-	c.Warn("%s", "a")
-	r := b.String()
-	if exp := "WARN  <prefix> a\n"; r != exp {
-		t.Errorf("Want %q, got %q", exp, r)
-	}
+	clone := l.Clone("<prefix>")
+	c.Assert(l.cfg.prefix, Not(Equals), clone.cfg.prefix)
+	clone.Debug("%s", "a")
+	clone.Warn("%s", "a")
+	c.Assert(b.String(), Equals, "WARN  <prefix> a\n")
 	l.Debug("%s", "a")
 	l.Warn("%s", "a")
 	Std().Clone("prefix").Info("format")
 }
 
-func TestFormat(t *testing.T) {
+func (s ConsoleSuite) TestFormat(c *C) {
 	var cfgs = []Cfg{
 		Cfg{Color: true, File: FileHide, Date: DateHide},
 		Cfg{Color: true, File: FileShow, Date: DateHour},
@@ -116,49 +86,40 @@ func TestFormat(t *testing.T) {
 	}
 }
 
-func TestPanic(t *testing.T) {
-	var cfgs = []Cfg{
-		Cfg{File: FileFmt(10)},
-		Cfg{Date: DateFmt(10)},
+func (s ConsoleSuite) TestPanic(c *C) {
+	var cfgs = []struct {
+		Cfg
+		Panic interface{}
+	}{
+		{Cfg{File: FileFmt(10)}, "Invalid FileFmt"},
+		{Cfg{Date: DateFmt(10)}, "Invalid DateFmt"},
 	}
 	for _, cfg := range cfgs {
-		testPanic(t, cfg)
+		c.Assert(func() {
+			New(cfg.Cfg, os.Stdout).Info("this will panic")
+		}, Panics, cfg.Panic)
 	}
 }
 
-func testPanic(t *testing.T, cfg Cfg) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fail()
-		}
-	}()
-	New(cfg, os.Stdout).Info("this will panic")
-}
-
-type null struct{}
-
-func (null) Write(p []byte) (n int, err error)       { return 0, nil }
-func (null) WriteString(s string) (n int, err error) { return 0, nil }
-
-func BenchmarkPlain(b *testing.B) {
-	c := New(Cfg{}, null{})
-	for n := 0; n < b.N; n++ {
-		c.Info("msg %v", n)
+func (s ConsoleSuite) BenchmarkPlain(c *C) {
+	l := New(Cfg{}, null{})
+	for n := 0; n < c.N; n++ {
+		l.Info("msg %v", n)
 	}
 }
 
-func BenchmarkStd(b *testing.B) {
-	c := New(Defaults, null{})
-	for n := 0; n < b.N; n++ {
-		c.Info("msg %v", n)
+func (s ConsoleSuite) BenchmarkStd(c *C) {
+	l := New(Defaults, null{})
+	for n := 0; n < c.N; n++ {
+		l.Info("msg %v", n)
 	}
 }
 
-func BenchmarkStdNoColor(b *testing.B) {
+func (s ConsoleSuite) BenchmarkStdNoColor(c *C) {
 	var cfg = Defaults
 	cfg.Color = false
-	c := New(cfg, null{})
-	for n := 0; n < b.N; n++ {
-		c.Info("msg %v", n)
+	l := New(cfg, null{})
+	for n := 0; n < c.N; n++ {
+		l.Info("msg %v", n)
 	}
 }

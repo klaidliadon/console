@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Console : A logging package for Go">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Console</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/klaidliadon/console">View on GitHub</a>
+
+          <h1 id="project_title">Console</h1>
+          <h2 id="project_tagline">A logging package for Go</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/klaidliadon/console/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/klaidliadon/console/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a id="welcome" class="anchor" href="#welcome" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Welcome</h1>
+
+<p><a href="https://godoc.org/gopkg.in/klaidliadon/console.v1"><img src="https://godoc.org/gopkg.in/klaidliadon/console.v1?status.svg" alt="GoDoc"></a>
+<a href="https://travis-ci.org/klaidliadon/console"><img src="https://travis-ci.org/klaidliadon/console.svg" alt="Build Status"></a>
+<a href="http://codecov.io/github/klaidliadon/console?branch=master"><img src="http://codecov.io/github/klaidliadon/console/coverage.svg?branch=master" alt="codecov.io"></a></p>
+
+<p>Console is a logger package for Go with the following features:</p>
+
+<ul>
+<li>Multiple priorities</li>
+<li>Fully configurable</li>
+<li>Thread safe</li>
+<li>Runtime execution of <code>func() string</code> arguments</li>
+<li>Introduces <code>Hooks</code> that can match some messages and reply with some actions.</li>
+</ul>
+
+<h2>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Usage</h2>
+
+<p>It's recommended to use <code>gopkg.in</code> to ensure to use a stable version.</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-k">import</span> (
+    <span class="pl-s"><span class="pl-pds">"</span>gopkg.in/klaidliadon/console.v1<span class="pl-pds">"</span></span>
+)</pre></div>
+
+<h3>
+<a id="basic-usage" class="anchor" href="#basic-usage" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Basic Usage</h3>
+
+<p>The standard console uses <code>os.Stdout</code>:</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-smi">c</span> <span class="pl-k">:=</span> console.<span class="pl-c1">Std</span>()
+c.<span class="pl-c1">Info</span>(<span class="pl-s"><span class="pl-pds">"</span>This is console<span class="pl-pds">"</span></span>)</pre></div>
+
+<h3>
+<a id="custom-console" class="anchor" href="#custom-console" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Custom Console</h3>
+
+<p>You can define your custom logger and use it:</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-c">// Create a *console.Console</span>
+<span class="pl-k">var</span> <span class="pl-smi">custom</span> = console.<span class="pl-c1">New</span>(console.<span class="pl-smi">Cfg</span>{
+    <span class="pl-v">Color</span>: <span class="pl-c1">true</span>, 
+    <span class="pl-v">Date</span>: console.<span class="pl-smi">DateFull</span>,
+}, w)
+custom.<span class="pl-c1">Trace</span>(<span class="pl-s"><span class="pl-pds">"</span>Ignored message <span class="pl-c1">%d</span><span class="pl-pds">"</span></span>, <span class="pl-c1">1</span>)
+custom.<span class="pl-c1">Info</span>(<span class="pl-s"><span class="pl-pds">"</span>Message not ignored <span class="pl-c1">%d</span><span class="pl-pds">"</span></span>, <span class="pl-c1">1</span>)</pre></div>
+
+<h2>
+<a id="features" class="anchor" href="#features" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Features</h2>
+
+<h3>
+<a id="runtime-execution" class="anchor" href="#runtime-execution" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Runtime execution</h3>
+
+<p>You can use a <code>func() string</code> as argument. Instead
+of the function the result string will be printed.
+If the message is ignored the function will not be executed.</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-k">var</span> <span class="pl-smi">a</span> = <span class="pl-v">Tree</span>{} <span class="pl-c">// With a very expensive String method</span>
+
+<span class="pl-smi">l</span> <span class="pl-k">:=</span> console.<span class="pl-c1">New</span>(console.<span class="pl-smi">Cfg</span>{Lvl: console.<span class="pl-smi">LvlDebug</span>})
+<span class="pl-c">// Tree.String is executed</span>
+l.<span class="pl-c1">Info</span>(<span class="pl-s"><span class="pl-pds">"</span>Method result: <span class="pl-c1">%s</span><span class="pl-pds">"</span></span>, a)
+<span class="pl-c">// Tree.String is ignored</span>
+l.<span class="pl-c1">Trace</span>(<span class="pl-s"><span class="pl-pds">"</span>Method result: <span class="pl-c1">%s</span><span class="pl-pds">"</span></span>, a)</pre></div>
+
+<h3>
+<a id="hooks" class="anchor" href="#hooks" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Hooks</h3>
+
+<p>An hook is interface used to capture certain conditions and execute an action.</p>
+
+<p>Here's an example:</p>
+
+<div class="highlight highlight-source-go"><pre><span class="pl-k">type</span> <span class="pl-v">Mailer</span> <span class="pl-k">struct</span> {
+    <span class="pl-v">Id</span>   <span class="pl-k">int64</span>
+    lvl  console.<span class="pl-smi">Lvl</span>
+    <span class="pl-v">Addr</span> <span class="pl-k">string</span>
+    <span class="pl-v">Auth</span> smtp.<span class="pl-smi">Auth</span>
+    <span class="pl-v">From</span> <span class="pl-k">string</span>
+    <span class="pl-v">To</span>   []<span class="pl-k">string</span>
+}
+
+<span class="pl-k">func</span> <span class="pl-en">(<span class="pl-v">m</span> <span class="pl-v">Mailer</span>) <span class="pl-en">Id</span></span>() <span class="pl-v">string</span> {
+    <span class="pl-k">return</span> fmt.<span class="pl-c1">Sprintf</span>(<span class="pl-s"><span class="pl-pds">"</span>mailer-hook-<span class="pl-c1">%d</span><span class="pl-pds">"</span></span>, m.<span class="pl-smi">Id</span>) 
+}
+
+<span class="pl-k">func</span> <span class="pl-en">(<span class="pl-v">m</span> <span class="pl-v">Mailer</span>) <span class="pl-en">Match</span></span>(<span class="pl-v">l</span> <span class="pl-v">Lvl</span>, <span class="pl-v">_</span>, <span class="pl-v">_</span> <span class="pl-v">string</span>, <span class="pl-v">_</span> ...<span class="pl-v">interface</span>{}) <span class="pl-v">bool</span> { 
+    <span class="pl-k">return</span> l == s.<span class="pl-smi">Lvl</span>
+}
+
+<span class="pl-k">func</span> <span class="pl-en">(<span class="pl-v">m</span> <span class="pl-v">Mailer</span>) <span class="pl-en">Action</span></span>(<span class="pl-v">l</span> <span class="pl-v">Lvl</span>, <span class="pl-v">msg</span>, <span class="pl-v">_</span> <span class="pl-v">string</span>, <span class="pl-v">_</span> ...<span class="pl-v">interface</span>{}) { 
+    smtp.<span class="pl-c1">SendMail</span>(m.<span class="pl-smi">Addr</span>, m.<span class="pl-smi">Auth</span>, m.<span class="pl-smi">From</span>, m.<span class="pl-smi">To</span>, fmt.<span class="pl-c1">Sprintf</span>(<span class="pl-s"><span class="pl-pds">"</span>[<span class="pl-c1">%s</span>] from MailHook: <span class="pl-c1">%s</span><span class="pl-pds">"</span></span>, l, msg)
+}</pre></div>
+
+<p>This hook captures the messages from a certain level and sends an email with the message content.</p>
+
+<h2>
+<a id="help" class="anchor" href="#help" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Help</h2>
+
+<p>For a complete reference read the <a href="http://godoc.org/gopkg.in/klaidliadon/console.v1" title="Godoc">docs</a>.</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Console maintained by <a href="https://github.com/klaidliadon">klaidliadon</a></p>
+        <p>Published with <a href="https://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
